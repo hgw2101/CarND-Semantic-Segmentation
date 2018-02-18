@@ -5,7 +5,6 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 
-
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
 print('TensorFlow Version: {}'.format(tf.__version__))
@@ -15,7 +14,6 @@ if not tf.test.gpu_device_name():
     warnings.warn('No GPU found. Please use a GPU to train your neural network.')
 else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
-
 
 def load_vgg(sess, vgg_path):
     """
@@ -33,9 +31,26 @@ def load_vgg(sess, vgg_path):
     vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
     
-    return None, None, None, None, None
-tests.test_load_vgg(load_vgg, tf)
+    # load the saved model using vgg_tag and vgg_path (i.e. directory)
+    tf.saved_model.loader.load(sess, [vgg_tag],vgg_path)
+    
+    # load default graph, this is how we get all the tensors
+    graph = tf.get_default_graph()
+    
+    # debug, check tensor names
+    #for n in tf.get_default_graph().as_graph_def().node:
+    #    print("tensor name:")
+    #    print(n.name)
 
+    # load the required tensors
+    image_input = graph.get_tensor_by_name(vgg_input_tensor_name)
+    keep_prob = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
+    layer3_out = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
+    layer4_out = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
+    layer7_out = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
+    
+    return image_input, keep_prob, layer3_out, layer4_out, layer7_out
+tests.test_load_vgg(load_vgg, tf)
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
@@ -43,13 +58,43 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param vgg_layer7_out: TF Tensor for VGG Layer 3 output
     :param vgg_layer4_out: TF Tensor for VGG Layer 4 output
     :param vgg_layer3_out: TF Tensor for VGG Layer 7 output
-    :param num_classes: Number of classes to classify
+    :param num_classes: Number of classes to classify, in this case 2 since it's binary, see implementation details below
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
-    return None
+    
+    # apply 1x1 convolution to the final VGG layer, i.e. VGG 7, set kernel size to 1 since it's 1x1 convolution
+    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
+                                kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #need to add regularizer
+    
+    # first transpose layer, i.e. de-convolution
+    transposed_1 = tf.layers.conv2d_transpose(conv_1x1, num_classes, kernel_size=4, strides=(2, 2), padding='same', 
+                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #why kernel size is 4?
+    
+    # add first skip layer
+    # 1) 1x1 conv based on vgg_layer4_out
+    conv_1x1_4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
+                                   kernel_initializer=tf.random_normal_initializer(stddev=0.01))
+    # 2) add conv_1x1_4 and transposed_1 to form the first skip layer
+    transposed_1 = tf.add(transposed_1, conv_1x1_4)
+    
+    # second tranpose layer, i.e. de-convolution
+    transposed_2 = tf.layers.conv2d_transpose(transposed_1, num_classes, kernel_size=4, strides=(2, 2), padding='same', 
+                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #why kernel size is 4?
+    
+    # add second skip layer
+    # 1) 1x1 conv based on vgg_layer3_out, i.e. a convolution layer even further back than vgg_layer4_out
+    conv_1x1_3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
+                                   kernel_initializer=tf.random_normal_initializer(stddev=0.01))
+    # 2) add conv_1x1_4 and transposed_1 to form the first skip layer
+    transposed_2 = tf.add(transposed_2, conv_1x1_3)
+    
+    # third and final upsample with a stride of 8, 8 to get the original input size
+    transposed_3 = tf.layers.conv2d_transpose(transposed_2, num_classes, kernel_size=4, strides=(8, 8), padding='same', 
+                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #why kernel size is 4?
+    
+    return transposed_3
 tests.test_layers(layers)
-
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
@@ -60,10 +105,15 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    # TODO: Implement function
-    return None, None, None
+    # nn_last_layer is 4D, so we need to reshape it to 2D
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+    print("--------------shape of logits")
+    cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    train_op = optimizer.minimize(cross_entropy_loss)
+    
+    return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
-
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate):
@@ -80,10 +130,24 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
-    pass
+    print("before running session")
+    sess.run(tf.global_variables_initializer())
+    print("--------------after initializing variables")
+    for i in range(epochs):
+        print("Epoch {} ...".format(i + 1))
+        for images, labels in get_batches_fn(batch_size):
+            print("========this is images shape")
+            print(images.shape)
+            print("========this is labels shape")
+            print(labels.shape)
+            print("========this is correct_label")
+            tf.Print(correct_label, [tf.shape(correct_label)])
+            print("========this is input_image")
+            tf.Print(input_image, [tf.shape(input_image)])
+            sess.run([train_op, cross_entropy_loss], feed_dict={input_image: images, correct_label: labels, keep_prob: 0.5, learning_rate: 0.001})
+    
+    
 tests.test_train_nn(train_nn)
-
 
 def run():
     num_classes = 2
@@ -109,8 +173,17 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
+        correct_label = tf.placeholder(tf.int32, shape=(None, None, None, num_classes))
+        learning_rate = tf.placeholder(tf.float32)
+        input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
+        final_layer = layers(layer3_out, layer4_out, layer7_out, num_classes)
+        logits, train_op, cross_entropy_loss = optimize(final_layer, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
+        epochs = 10
+        batch_size = 5 #can't be too high or you'll get a Resource out exception
+        
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
 
         # TODO: Save inference data using helper.save_inference_samples
         #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
