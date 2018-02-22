@@ -4,6 +4,7 @@ import helper
 import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
+import time
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -144,7 +145,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             #tf.Print(correct_label, [tf.shape(correct_label)])
             #print("========this is input_image")
             #tf.Print(input_image, [tf.shape(input_image)])
-            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: images, correct_label: labels, keep_prob: 0.5, learning_rate: 0.001})
+            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: images, correct_label: labels, keep_prob: 0.5, learning_rate: 0.0001})
             print("loss: " + str(loss))
     
     
@@ -163,6 +164,8 @@ def run():
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
+
+    start_time = time.time()
 
     with tf.Session() as sess:
         # Path to vgg model
@@ -185,6 +188,10 @@ def run():
         batch_size = 5 #can't be too high or you'll get a Resource out exception
         
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
+
+        end_time = time.time()
+
+        print("total training time: " + str(end_time - start_time))
 
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
