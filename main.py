@@ -145,7 +145,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             #tf.Print(correct_label, [tf.shape(correct_label)])
             #print("========this is input_image")
             #tf.Print(input_image, [tf.shape(input_image)])
-            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: images, correct_label: labels, keep_prob: 0.5, learning_rate: 0.0001})
+            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: images, correct_label: labels, keep_prob: 0.5, learning_rate: 1e-5})
             print("loss: " + str(loss))
     
     
@@ -184,14 +184,14 @@ def run():
         logits, train_op, cross_entropy_loss = optimize(final_layer, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        epochs = 20
-        batch_size = 5 #can't be too high or you'll get a Resource out exception
+        epochs = 50
+        batch_size = 2 #can't be too high or you'll get a Resource out exception
         
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
 
         end_time = time.time()
 
-        print("total training time: " + str(end_time - start_time))
+        print("total training time: " + str(end_time - start_time) + " seconds.")
 
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
