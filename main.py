@@ -76,7 +76,8 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     
     # add first skip layer
     # 1) 1x1 conv based on vgg_layer4_out
-    conv_1x1_4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
+    vgg_layer4_out_scaled = tf.multiply(vgg_layer4_out, 0.01, name=‘vgg_layer4_out_caled’)
+    conv_1x1_4 = tf.layers.conv2d(vgg_layer4_out_scaled, num_classes, kernel_size=1, strides=(1,1), padding='same', 
                                    kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     # 2) add conv_1x1_4 and transposed_1 to form the first skip layer
@@ -89,7 +90,8 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     
     # add second skip layer
     # 1) 1x1 conv based on vgg_layer3_out, i.e. a convolution layer even further back than vgg_layer4_out
-    conv_1x1_3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
+    vgg_layer3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name=‘vgg_layer3_out_scaled’)
+    conv_1x1_3 = tf.layers.conv2d(vgg_layer3_out_scaled, num_classes, kernel_size=1, strides=(1,1), padding='same', 
                                    kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     # 2) add conv_1x1_4 and transposed_1 to form the first skip layer
