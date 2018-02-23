@@ -66,33 +66,39 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     
     # apply 1x1 convolution to the final VGG layer, i.e. VGG 7, set kernel size to 1 since it's 1x1 convolution
     conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
-                                kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #need to add regularizer
+                                kernel_initializer=tf.random_normal_initializer(stddev=0.01), 
+                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     
     # first transpose layer, i.e. de-convolution
     transposed_1 = tf.layers.conv2d_transpose(conv_1x1, num_classes, kernel_size=4, strides=(2, 2), padding='same', 
-                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #why kernel size is 4?
+                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) #why kernel size is 4?
     
     # add first skip layer
     # 1) 1x1 conv based on vgg_layer4_out
     conv_1x1_4 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
-                                   kernel_initializer=tf.random_normal_initializer(stddev=0.01))
+                                   kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     # 2) add conv_1x1_4 and transposed_1 to form the first skip layer
     transposed_1 = tf.add(transposed_1, conv_1x1_4)
     
     # second tranpose layer, i.e. de-convolution
     transposed_2 = tf.layers.conv2d_transpose(transposed_1, num_classes, kernel_size=4, strides=(2, 2), padding='same', 
-                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #why kernel size is 4?
+                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) #why kernel size is 4?
     
     # add second skip layer
     # 1) 1x1 conv based on vgg_layer3_out, i.e. a convolution layer even further back than vgg_layer4_out
     conv_1x1_3 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size=1, strides=(1,1), padding='same', 
-                                   kernel_initializer=tf.random_normal_initializer(stddev=0.01))
+                                   kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     # 2) add conv_1x1_4 and transposed_1 to form the first skip layer
     transposed_2 = tf.add(transposed_2, conv_1x1_3)
     
     # third and final upsample with a stride of 8, 8 to get the original input size
     transposed_3 = tf.layers.conv2d_transpose(transposed_2, num_classes, kernel_size=4, strides=(8, 8), padding='same', 
-                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01)) #why kernel size is 4?
+                                        kernel_initializer=tf.random_normal_initializer(stddev=0.01),
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) #why kernel size is 4?
     
     return transposed_3
 tests.test_layers(layers)
