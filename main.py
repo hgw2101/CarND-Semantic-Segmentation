@@ -191,7 +191,11 @@ def run():
 
         end_time = time.time()
 
+<<<<<<< HEAD
         print("total training time: " + str(end_time - start_time) + " seconds.")
+=======
+        print("total training time: " + str(end_time - start_time))
+>>>>>>> c2bdd9de1257f19863b7e151516a46dfbd29b175
 
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
