@@ -76,7 +76,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     
     # add first skip layer
     # 1) 1x1 conv based on vgg_layer4_out
-    vgg_layer4_out_scaled = tf.multiply(vgg_layer4_out, 0.01, name=‘vgg_layer4_out_caled’)
+    vgg_layer4_out_scaled = tf.multiply(vgg_layer4_out, 0.01, name='vgg_layer4_out_caled')
     conv_1x1_4 = tf.layers.conv2d(vgg_layer4_out_scaled, num_classes, kernel_size=1, strides=(1,1), padding='same', 
                                    kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
@@ -90,7 +90,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     
     # add second skip layer
     # 1) 1x1 conv based on vgg_layer3_out, i.e. a convolution layer even further back than vgg_layer4_out
-    vgg_layer3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name=‘vgg_layer3_out_scaled’)
+    vgg_layer3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name='vgg_layer3_out_scaled')
     conv_1x1_3 = tf.layers.conv2d(vgg_layer3_out_scaled, num_classes, kernel_size=1, strides=(1,1), padding='same', 
                                    kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
@@ -118,8 +118,13 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     print("--------------shape of logits")
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label))
+
+    # add regularization loss manually or else kernel_regularizor does nothing (https://stackoverflow.com/questions/37107223/how-to-add-regularizations-in-tensorflow)
+    reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    reg_constant = 0.01 #play with this a bit
+    total_loss = cross_entropy_loss + reg_constant * sum(reg_losses)
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    train_op = optimizer.minimize(cross_entropy_loss)
+    train_op = optimizer.minimize(total_loss)
     
     return logits, train_op, cross_entropy_loss
 tests.test_optimize(optimize)
@@ -192,8 +197,8 @@ def run():
         logits, train_op, cross_entropy_loss = optimize(final_layer, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        epochs = 50
-        batch_size = 2 #can't be too high or you'll get a Resource out exception
+        epochs = 20
+        batch_size = 4 #can't be too high or you'll get a Resource out exception
         
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
 
