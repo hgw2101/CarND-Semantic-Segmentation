@@ -5,6 +5,10 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 import time
+# visualize graph
+from tensorflow.python.platform import gfile
+from tensorflow.core.protobuf import saved_model_pb2
+from tensorflow.python.util import compat
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -98,9 +102,11 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     transposed_2 = tf.add(transposed_2, conv_1x1_3)
     
     # third and final upsample with a stride of 8, 8 to get the original input size
-    transposed_3 = tf.layers.conv2d_transpose(transposed_2, num_classes, kernel_size=16, strides=(8, 8), padding='same', 
+    # kernel size has to be bigger or else it won't work. This makes sense because at small kernels, e.g. 4x4, cannot smartly
+    # distinguish road vs non-road, so loss was consistently high at ~0.5. A bigger kernel is needed to help see the 'big picture'
+    transposed_3 = tf.layers.conv2d_transpose(transposed_2, num_classes, kernel_size=32, strides=(8, 8), padding='same', 
                                         kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) #why kernel size is 16?
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
     
     return transposed_3
 tests.test_layers(layers)
@@ -186,6 +192,14 @@ def run():
         # Create function to get batches
         get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
 
+        # visualize graph
+        model_filepath = os.path.join(data_dir, 'saved_model.pb')
+        with gfile.FastGFile(model_filepath, 'rb') as f:
+            data = compat.as_bytes(f.read())
+            sm = saved_model_pb2.SavedModel()
+            sm.ParseFromString(data)
+            g_in = tf.import_graph_def(sm.meta_graphs[0].graph_def)
+
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
@@ -198,7 +212,7 @@ def run():
 
         # TODO: Train NN using the train_nn function
         epochs = 50
-        batch_size = 4 #can't be too high or you'll get a Resource out exception
+        batch_size = 2 #can't be too high or you'll get a Resource out exception
         
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
 
@@ -210,6 +224,10 @@ def run():
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
+
+    LOGDIR='.'
+    train_writer = tf.summary.FileWriter(LOGDIR)
+    train_writer.add_graph(sess.graph)
 
 
 if __name__ == '__main__':
