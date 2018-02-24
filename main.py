@@ -193,7 +193,7 @@ def run():
         get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
 
         # visualize graph
-        model_filepath = os.path.join(data_dir, 'saved_model.pb')
+        model_filepath = os.path.join(data_dir, 'vgg/saved_model.pb')
         with gfile.FastGFile(model_filepath, 'rb') as f:
             data = compat.as_bytes(f.read())
             sm = saved_model_pb2.SavedModel()
@@ -225,6 +225,8 @@ def run():
 
         # OPTIONAL: Apply the trained model to a video
 
+    # save graph to event, to access it, run tensorboard --logdir=. inside the directory where the event file lives,
+    # then go to port <server-ip-address>:6006 to access it, then click on the 'graph' tab to visualize the graph
     LOGDIR='.'
     train_writer = tf.summary.FileWriter(LOGDIR)
     train_writer.add_graph(sess.graph)
