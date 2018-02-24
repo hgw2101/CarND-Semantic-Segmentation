@@ -98,9 +98,9 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     transposed_2 = tf.add(transposed_2, conv_1x1_3)
     
     # third and final upsample with a stride of 8, 8 to get the original input size
-    transposed_3 = tf.layers.conv2d_transpose(transposed_2, num_classes, kernel_size=4, strides=(8, 8), padding='same', 
+    transposed_3 = tf.layers.conv2d_transpose(transposed_2, num_classes, kernel_size=16, strides=(8, 8), padding='same', 
                                         kernel_initializer=tf.truncated_normal_initializer(stddev=0.01),
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) #why kernel size is 4?
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3)) #why kernel size is 16?
     
     return transposed_3
 tests.test_layers(layers)
@@ -122,7 +122,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     # add regularization loss manually or else kernel_regularizor does nothing (https://stackoverflow.com/questions/37107223/how-to-add-regularizations-in-tensorflow)
     reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     reg_constant = 0.01 #play with this a bit
-    total_loss = cross_entropy_loss + reg_constant * sum(reg_losses)
+    total_loss = cross_entropy_loss + reg_constant * tf.reduce_sum(reg_losses)
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
     train_op = optimizer.minimize(total_loss)
     
@@ -197,7 +197,7 @@ def run():
         logits, train_op, cross_entropy_loss = optimize(final_layer, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        epochs = 20
+        epochs = 50
         batch_size = 4 #can't be too high or you'll get a Resource out exception
         
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
